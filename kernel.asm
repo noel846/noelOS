@@ -1,5 +1,5 @@
 bits 32
-org 0x8000
+
 
 mov ax, 0x0010
 mov ds, ax
@@ -25,8 +25,11 @@ mov esi, msg
 .done:
 
 
-extern kernel_main
-call kernel_main
+extern _kernel_main
+call _kernel_main
+
+.hang:
+    jmp .hang
 
 
 msg: db "hello from protected mode", 0
