@@ -1,32 +1,11 @@
-bits 16
+bits 32
 
-mov ax, 0x0800
+mov ax, 0x0010
 mov ds, ax
 
-push msg
-call print
-add sp, 2
+mov edi, 0xB8000
+mov byte [edi], 'H'
+mov byte [edi+1], 0x0F
 
-print:
-   push bp
-   mov bp, sp
-   pusha
-   mov si, [bp+4]
-   mov bh, 0x00
-   mov bl, 0x00
-   mov ah, 0x0E
-.char:
-   mov al, [si]
-   add si, 1
-   or al, 0
-   je .return
-   int 0x10
-   jmp .char
-.return:
-    popa
-    mov sp, bp
-    pop bp
-    ret
-
-
-msg: db " kernel loaded", 0
+cli
+hlt
