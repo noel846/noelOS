@@ -25,8 +25,8 @@ mov esi, msg
 .done:
 
 
-cli
-hlt
+extern kernel_main
+call kernel_main
 
 
 msg: db "hello from protected mode", 0
