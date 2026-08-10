@@ -2,6 +2,7 @@ bits 16
 
 mov ax, 0x07C0
 mov ds, ax
+mov [bootdrive], dl
 mov ax, 0x7E0
 mov ss, ax
 mov sp, 0x2000
@@ -15,6 +16,9 @@ add sp, 2
 push msg
 call print
 add sp, 2
+
+call loaddisk
+jmp 0x0000:0x08000
 
 cli
 hlt
@@ -52,6 +56,19 @@ movecursor:
     pop bp
     ret
 
+loaddisk:
+    mov ax, 0
+    mov es, ax
+    mov ah, 0x02
+    mov al, 1
+    mov ch, 0
+    mov cl, 2
+    mov dh, 0
+    mov dl, [bootdrive]
+    mov bx, 0x8000
+    int 0x13
+    ret
+
 print:
    push bp
    mov bp, sp
@@ -73,6 +90,8 @@ print:
     pop bp
     ret
 
+
+bootdrive: db 0
 
 msg: db "hello", 0
 
