@@ -1,6 +1,5 @@
 bits 32
 
-
 mov ax, 0x0010
 mov ds, ax
 
@@ -10,26 +9,8 @@ mov gs, ax
 mov ss, ax
 mov esp, 0x90000
 
-mov edi, 0xB8000
-mov esi, msg
-
-.loop:
-    mov al, [esi]
-    cmp al, 0
-    je .done
-    mov [edi], al
-    mov byte [edi+1], 0x0F
-    add esi, 1
-    add edi, 2
-    jmp .loop
-.done:
-
-
 extern _kernel_main
 call _kernel_main
 
 .hang:
     jmp .hang
-
-
-msg: db "hello from protected mode", 0

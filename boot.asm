@@ -18,6 +18,7 @@ call print
 add sp, 2
 
 call loaddisk
+
 cli
 lgdt [gdt_descriptor]
 
@@ -64,7 +65,8 @@ movecursor:
     ret
 
 loaddisk:
-    mov ax, 0
+    push es
+    xor ax, ax
     mov es, ax
     mov ah, 0x02
     mov al, 1
@@ -74,6 +76,7 @@ loaddisk:
     mov dl, [bootdrive]
     mov bx, 0x8000
     int 0x13
+    pop es
     ret
 
 print:
