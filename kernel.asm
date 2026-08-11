@@ -9,8 +9,10 @@ mov gs, ax
 mov ss, ax
 mov esp, 0x90000
 
-extern _kernel_main
-call _kernel_main
+extern kernel_main
+call kernel_main
 
 .hang:
     jmp .hang
+
+section .note.GNU-stack noalloc noexec nowrite progbits
