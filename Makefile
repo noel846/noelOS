@@ -15,6 +15,7 @@ kernel.bin: kernel_asm.o kernel.o
 
 os.bin: boot.bin kernel.bin
 	cat boot.bin kernel.bin > os.bin
+	truncate -s 4096 os.bin
 
 run: os.bin
 	qemu-system-x86_64 -drive format=raw,file=os.bin

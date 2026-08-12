@@ -1,12 +1,17 @@
 char* video = (char*) 0xB8000;
 int cursor = 0;
 
+unsigned char color = 0x0F;
+
+char input[256];
+int input_len = 0;
+
 
 void clear(){
     int i = 0;
     while(i < 80 * 25 * 2){
         video[i] = ' ';
-        video[i + 1] = 0x0F;
+        video[i + 1] = color;
         i = i + 2;
     }
     cursor = 0;
@@ -20,11 +25,11 @@ void print(char* str){
             if (cursor >= 2){
                 cursor = cursor - 2;
                 video[cursor] = ' ';
-                video[cursor + 1] = 0x0F;
+                video[cursor + 1] = color;
             }
         } else{
             video[cursor] = str[i];
-            video[cursor + 1] = 0x0F;
+            video[cursor + 1] = color;
             cursor = cursor + 2;
         }
         i = i + 1;
@@ -55,16 +60,64 @@ char getkey(){
     return 0;
 }
 
+int streq(char* a, char* b){
+    int  i = 0;
+    while(a[i] != 0 && b[i] != 0){
+        if(a[i] != b[i]) return 0;
+        i = i + 1;
+    }
+    return a[i] == b[i];
+}
+void run_command(){
+    if(streq(input, "hello")){
+        print("\nwaddup\n");
+    } else if(streq(input, "clear")){
+        clear();
+    } else if (streq(input, "bgcol red")) {
+        color = (0x4 << 4) | (color &0x0f);
+        clear();
+    } else if (streq(input, "bgcol black")) {
+        color = (0x0 << 4) | (color &0x0f);
+        clear();
+    } else if (streq(input, "txcol blue")) {
+        color = (color & 0xF0) | 0x1;
+    } else if (streq(input, "txcol white")) {
+        color = (color & 0xF0) | 0xF;
+    } else{
+        print("\nunknown command: ");
+        print(input);
+        print("\n");
+    }
+    print("> ");
+}
+
 void kernel_main(){
     clear();
     print("noelOS\n> ");
     while(1){
         char c = getkey();
-        if(c != 0){
+        if(c == '\n'){
+            input[input_len] = 0;
+            print("\n");
+            if(input_len > 0){
+                run_command();
+            } else{
+                print("> ");
+            }
+            input_len = 0;
+        } else if (c == '\b') {
+            if(input_len > 0){
+                input_len = input_len - 1;
+                print("\b");
+            }
+        } else if (c != 0) {
+            input[input_len] = c;
+            input_len = input_len +1;
             char str[2];
             str[0] = c;
             str[1] = 0;
             print(str);
+        
         }
     }
 }
