@@ -6,6 +6,13 @@ unsigned char color = 0x0F;
 char input[256];
 int input_len = 0;
 
+char* heap = (char*) 0x100000;
+
+void* malloc(int size){
+    void* ptr = heap;
+    heap = heap + size;
+    return ptr;
+}
 
 void clear(){
     int i = 0;
@@ -222,11 +229,20 @@ void run_command(){
         print("\nticks: ");
         print_int(ticks);
         print("\n");
+    }else if (streq(cmd, "memtest")) {
+        char* buf = malloc(16);
+        buf[0] = 'h';
+        buf[1] = 'i';
+        buf[2] = 0;
+        print("\n");
+        print(buf);
+        print("\n");
     } else{
         print("\nunknown command: ");
         print(input);
         print("\n");
     }
+
 
     print("> ");
 }
