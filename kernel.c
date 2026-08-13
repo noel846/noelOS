@@ -42,10 +42,23 @@ unsigned char inb(unsigned short port){
     __asm__ volatile ("inb %1, %0" : "=a"(result) : "Nd"(port));
     return result;
 }
-
 void outb(unsigned short port, unsigned char value){
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
 }
+struct interrupt_frame;
+volatile unsigned int ticks = 0;
+__attribute__((interrupt))
+void timer_handler(struct interrupt_frame* frame){
+    ticks = ticks + 1;
+    outb(0x20, 0x20);
+}
+void init_pit(int hz){
+    int divisor = 1193182 / hz;
+    outb(0x43, 0x36);
+    outb(0x40, divisor & 0xFF);
+    outb(0x40, (divisor >> 8) & 0xFF);
+}
+
 void pic_remap(){
     outb(0x20, 0x11);
     outb(0xA0, 0x11);
@@ -90,7 +103,6 @@ char scancode_to_ascii[] = {
     0, '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 0,
     '*', 0, ' '
 };
-struct interrupt_frame;
 volatile char pending_key = 0;
 __attribute__((interrupt))
 void keyboard_handler(struct interrupt_frame* frame){
@@ -206,15 +218,29 @@ void run_command(){
             print(arg);
             print("\n");
         }
-    }  else{
+    } else if(streq(cmd, "uptime")) {
+        print("\nticks: ");
+        print_int(ticks);
+        print("\n");
+    } else{
         print("\nunknown command: ");
         print(input);
         print("\n");
     }
+
     print("> ");
 }
 
 void kernel_main(){
+    pic_remap();
+    set_idt_gate(0x20, (unsigned int)(unsigned long)timer_handler, 0x08, 0x8E);
+    set_idt_gate(0x21, (unsigned int)(unsigned long)keyboard_handler, 0x08, 0x8E);
+    load_idt();
+    init_pit(100);
+    outb(0x21, 0xFE);
+    outb(0xA1, 0xFF);
+    __asm__ volatile ("sti");
+
     clear();
     print("noelOS\n> ");
     while(1){
