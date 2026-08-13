@@ -60,6 +60,39 @@ char getkey(){
     return 0;
 }
 
+char digit_to_char(int d){
+    return '0' + d;
+}
+void print_int(int n){
+    if(n == 0){
+        print("0");
+        return;
+    }
+    if(n < 0){
+        print("-");
+        n = -n;
+    }
+    char buf[12];
+    int len = 0;
+    while(n > 0){
+        int digit = n % 10;
+        buf[len] = digit_to_char(digit);
+        len = len + 1;
+        n = n / 10;
+    }
+    int start = 0;
+    int end = len - 1;
+    while(start < end){
+        char temp = buf[start];
+        buf[start] = buf[end];
+        buf[end] = temp;
+        start = start + 1;
+        end = end - 1;
+    }
+    buf[len] = 0;
+    print(buf);
+}
+
 int streq(char* a, char* b){
     int  i = 0;
     while(a[i] != 0 && b[i] != 0){
