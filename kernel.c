@@ -68,22 +68,57 @@ int streq(char* a, char* b){
     }
     return a[i] == b[i];
 }
+int color_from_name(char* name){
+    if(streq(name, "black")) return 0x0;
+    if(streq(name, "blue")) return 0x1;
+    if(streq(name, "green")) return 0x2;
+    if(streq(name, "red")) return 0x4;
+    if(streq(name, "white")) return 0xF;
+    return -1;
+}
 void run_command(){
-    if(streq(input, "hello")){
+    char cmd[32];
+    char arg[32];
+    int i = 0;
+    while(input[i] != 0 && input[i] != ' ') {
+        cmd[i] = input[i];
+        i = i + 1;
+    }
+    cmd[i] = 0;
+    if(input[i] == ' '){
+        i = i + 1;
+    }
+    int j = 0;
+    while(input[i] != 0){
+        arg[j] = input[i];
+        i = i + 1;
+        j = j + 1;
+    }
+    arg[j] = 0;
+    if(streq(cmd, "hello")){
         print("\nwaddup\n");
-    } else if(streq(input, "clear")){
+    } else if(streq(cmd, "clear")){
         clear();
-    } else if (streq(input, "bgcol red")) {
-        color = (0x4 << 4) | (color &0x0f);
-        clear();
-    } else if (streq(input, "bgcol black")) {
-        color = (0x0 << 4) | (color &0x0f);
-        clear();
-    } else if (streq(input, "txcol blue")) {
-        color = (color & 0xF0) | 0x1;
-    } else if (streq(input, "txcol white")) {
-        color = (color & 0xF0) | 0xF;
-    } else{
+    } else if (streq(cmd, "bgcol")) {
+        int c  =  color_from_name(arg);
+        if(c >= 0){
+            color = (c << 4) | (color & 0x0F);
+            clear();
+        } else {
+            print("\nunknown color: ");
+            print(arg);
+            print("\n");
+        }
+    } else if(streq(cmd, "txcol")){
+        int c = color_from_name(arg);
+        if(c >= 0){
+            color = (color & 0xF0) | c;
+        } else {
+            print("\nunknown color: ");
+            print(arg);
+            print("\n");
+        }
+    }  else{
         print("\nunknown command: ");
         print(input);
         print("\n");
