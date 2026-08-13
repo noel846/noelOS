@@ -42,6 +42,7 @@ unsigned char inb(unsigned short port){
     __asm__ volatile ("inb %1, %0" : "=a"(result) : "Nd"(port));
     return result;
 }
+
 void outb(unsigned short port, unsigned char value){
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
 }
@@ -79,7 +80,7 @@ struct idt_ptr{
 struct idt_ptr idtp;
 void load_idt(){
     idtp.limit = (sizeof(struct idt_entry) * 256) - 1;
-    idtp.base = (unsigned int) &idt;
+    idtp.base = (unsigned int)(unsigned long) &idt;
     __asm__ volatile ("lidt (%0)" : : "r"(&idtp));
 }
 char scancode_to_ascii[] = {
@@ -90,16 +91,13 @@ char scancode_to_ascii[] = {
     '*', 0, ' '
 };
 struct interrupt_frame;
+volatile char pending_key = 0;
 __attribute__((interrupt))
 void keyboard_handler(struct interrupt_frame* frame){
     unsigned char scancode = inb(0x60);
     if(!(scancode & 0x80)){
-        char c = scancode_to_ascii[scancode];
-        if(c != 0){
-            char str[2];
-            str[0] = c;
-            str[1] = 0;
-            print(str);
+        if(scancode < sizeof(scancode_to_ascii)){
+            pending_key = scancode_to_ascii[scancode];
         }
     }
     outb(0x20, 0x20);

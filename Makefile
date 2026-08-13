@@ -7,7 +7,7 @@ kernel_asm.o: kernel.asm
 	nasm -f elf32 kernel.asm -o kernel_asm.o
 
 kernel.o: kernel.c
-	gcc -ffreestanding -m32 -fno-pic -fno-pie -c kernel.c -o kernel.o
+	gcc -ffreestanding -m32 -fno-pic -fno-pie -mgeneral-regs-only -c kernel.c -o kernel.o
 
 kernel.bin: kernel_asm.o kernel.o
 	ld -m elf_i386 -T link.ld kernel_asm.o kernel.o -o kernel.tmp
