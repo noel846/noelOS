@@ -36,10 +36,51 @@ void print(char* str){
     }
 }
 
+
 unsigned char inb(unsigned short port){
     unsigned char result;
     __asm__ volatile ("inb %1, %0" : "=a"(result) : "Nd"(port));
     return result;
+}
+void outb(unsigned short port, unsigned char value){
+    __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
+}
+void pic_remap(){
+    outb(0x20, 0x11);
+    outb(0xA0, 0x11);
+    outb(0x21, 0x20);
+    outb(0xA1, 0x28);
+    outb(0x21, 0x04);
+    outb(0xA1, 0x02);
+    outb(0x21, 0x01);
+    outb(0xA1, 0x01);
+    outb(0x21, 0xFD);
+    outb(0xA1, 0xFF);
+}
+struct idt_entry{
+    unsigned short offset_low;
+    unsigned short selector;
+    unsigned char zero;
+    unsigned char type_attr;
+    unsigned short offset_high;
+} __attribute__((packed));
+struct idt_entry idt[256];
+void set_idt_gate(int n, unsigned int handler, unsigned short selector, unsigned char flags){
+    idt[n].offset_low = handler & 0xFFFF;
+    idt[n].offset_high = (handler >> 16) & 0xFFFF;
+    idt[n].selector = selector;
+    idt[n].zero = 0;
+    idt[n].type_attr = flags;
+}
+struct idt_ptr{
+    unsigned short limit;
+    unsigned int base;
+} __attribute__((packed));
+struct idt_ptr idtp;
+void load_idt(){
+    idtp.limit = (sizeof(struct idt_entry) * 256) - 1;
+    idtp.base = (unsigned int) &idt;
+    __asm__ volatile ("lidt (%0)" : : "r"(&idtp));
 }
 char scancode_to_ascii[] = {
     0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',
@@ -48,6 +89,22 @@ char scancode_to_ascii[] = {
     0, '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 0,
     '*', 0, ' '
 };
+struct interrupt_frame;
+__attribute__((interrupt))
+void keyboard_handler(struct interrupt_frame* frame){
+    unsigned char scancode = inb(0x60);
+    if(!(scancode & 0x80)){
+        char c = scancode_to_ascii[scancode];
+        if(c != 0){
+            char str[2];
+            str[0] = c;
+            str[1] = 0;
+            print(str);
+        }
+    }
+    outb(0x20, 0x20);
+}
+
 char getkey(){
     unsigned char scancode;
     do {
