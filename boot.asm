@@ -69,7 +69,7 @@ loaddisk:
     xor ax, ax
     mov es, ax
     mov ah, 0x02
-    mov al, 4
+    mov al, 8
     mov ch, 0
     mov cl, 2
     mov dh, 0
