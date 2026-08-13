@@ -23,6 +23,21 @@ void clear(){
     }
     cursor = 0;
 }
+void scroll(){
+    int i = 0;
+    while(i < 80 * 24 * 2){
+        video[i] = video[i + 160];
+        video[i + 1] = video[i + 161];
+        i = i + 2;
+    }
+    i = 80 * 24 * 2;
+    while(i < 80 * 25 *2){
+        video[i] = ' ';
+        video[i + 1] = color;
+        i = i + 2;
+    }
+    cursor = 80 * 24 * 2;
+}
 void print(char* str){
     int i = 0;
     while(str[i] != 0){
