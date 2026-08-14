@@ -17,15 +17,33 @@ of a session; work is often pushed from whichever machine was used last.
 - Kernel entry (kernel.asm) sets flat segments (DS/ES/FS/GS/SS=0x0010), stack at ESP=0x90000,
   calls `kernel_main` (no underscore — see Build below)
 - C kernel (kernel.c) has:
-  - `print()` with global `video`/`cursor` — supports `\n` and `\b` (backspace)
+  - `print()` with global `video`/`cursor` — supports `\n` and `\b` (backspace). **Does not
+    scroll yet** — `scroll()` exists (shifts all rows up one, clears the last row) but is
+    never called from `print()`, so typing past the bottom of the screen currently just
+    writes into off-screen VGA memory instead of scrolling. This is the obvious next fix.
   - `clear()` fills the screen with the current `color`
   - VGA color support: `color` is a global attribute byte (fg | bg<<4)
-  - PS/2 keyboard driver: `inb()` inline asm port read, polls port 0x64 status + 0x60 data,
-    `scancode_to_ascii[]` lookup table, `getkey()` busy-waits for a keypress (no IRQs/IDT yet)
-  - A basic shell in `kernel_main`: reads a line via `getkey()`, echoes it, runs `run_command()`
-    on Enter. Commands so far: `hello`, `clear`, `bgcol red`, `bgcol black`, `txcol blue`,
-    `txcol white` (uncommitted local addition in progress: `txcol green`)
-  - Command matching is a straight `streq()` chain — no argument parsing yet
+  - `print_int()` — prints signed decimal integers (handles 0 and negatives)
+  - `malloc()` — a bump allocator only (`heap` pointer starts at 0x100000 and just advances by
+    `size` each call, no `free()`, no bounds/OOM checking)
+  - Interrupts are wired up: PIC remapped (`pic_remap()`), IDT built (`idt[256]`,
+    `set_idt_gate()`, `load_idt()`), `sti` enabled in `kernel_main`
+  - `timer_handler` (IDT gate 0x20) runs off the PIT (`init_pit(100)` = 100 Hz) and increments
+    a global `ticks` counter — this IRQ (IRQ0) is unmasked and actually firing
+  - `keyboard_handler` (IDT gate 0x21) exists, filters key-release codes, sets `pending_key` —
+    but **IRQ1 is currently masked** (`kernel_main` does `outb(0x21, 0xFE)` after `init_pit`,
+    which enables only IRQ0/timer and disables IRQ1/keyboard). So the keyboard interrupt path
+    is built but inert; `getkey()` (the original polling version) is still what actually drives
+    the shell, deliberately avoiding the getkey()-vs-ISR conflict we identified. `pending_key`
+    is also unused right now. Unmasking IRQ1 and switching the shell loop over to consume
+    `pending_key` instead of polling is unfinished work.
+  - PS/2 keyboard: `inb()`/`outb()` inline asm port I/O, `scancode_to_ascii[]` lookup table,
+    `getkey()` busy-waits on port 0x64 status + reads port 0x60 (still the live input path)
+  - A shell in `kernel_main`: reads a line via `getkey()`, echoes it, runs `run_command()` on
+    Enter. `run_command()` splits `input` into `cmd`/`arg` and dispatches on `cmd`. Commands:
+    `hello`, `clear`, `bgcol <color>`, `txcol <color>` (colors: black/blue/green/red/white via
+    `color_from_name()`), `uptime` (prints `ticks`), `memtest` (mallocs 16 bytes, writes/prints
+    a string into it)
 - Screen boots into a live shell prompt (`noelOS\n> `) that accepts typed commands
 
 ## Build (unified — works on both Windows/MinGW and Ubuntu)
@@ -41,7 +59,7 @@ Manual steps (what the Makefile does):
 ```
 nasm -f bin boot.asm -o boot.bin
 nasm -f elf32 kernel.asm -o kernel_asm.o
-gcc -ffreestanding -m32 -fno-pic -fno-pie -c kernel.c -o kernel.o
+gcc -ffreestanding -m32 -fno-pic -fno-pie -mgeneral-regs-only -c kernel.c -o kernel.o
 ld -m elf_i386 -T link.ld kernel_asm.o kernel.o -o kernel.tmp
 objcopy -O binary kernel.tmp kernel.bin
 cat boot.bin kernel.bin > os.bin   # pad to (1+8)*512 bytes if short — see Makefile
@@ -74,19 +92,28 @@ plain PowerShell/cmd won't have them.
   avoid comma-splitting), from the project directory.
 - Windows PATH: NASM at C:\Program Files\NASM\, MinGW at C:\MinGW\bin\, QEMU at
   C:\Program Files\qemu\
-- Keyboard input is currently **polled** (busy-wait on port 0x64), not interrupt-driven —
-  no IDT/PIC setup yet. Fine for a single-threaded shell but will need to change once timers
-  or multitasking are added.
+- GCC's `__attribute__((interrupt))` is used for ISRs instead of hand-written asm stubs —
+  auto-generates register save/restore and `iret`. Requires `-mgeneral-regs-only` (added to
+  the Makefile) to stop GCC from touching FPU/SSE registers the attribute doesn't save.
+  Every ISR **must** call `outb(0x20, 0x20)` (EOI) unconditionally on every invocation,
+  including for scancodes/events you otherwise ignore — skipping it stalls that IRQ line
+  forever since the PIC thinks the interrupt is still being handled.
+- PIC IRQ mask register (port 0x21 master / 0xA1 slave): bit=1 means that IRQ is **disabled**,
+  bit=0 means enabled. Easy to get backwards. Currently keyboard (IRQ1) is masked off on
+  purpose — see keyboard_handler note above.
+- Keyboard polling (`getkey()`) and the keyboard IRQ handler both drain the same PS/2 output
+  buffer (port 0x60) — running both live at once means they race for every keystroke and one
+  starves the other. Don't unmask IRQ1 without also switching the shell off `getkey()` polling.
 
 ## Roadmap / next steps (rough order)
-1. Finish/clean up shell commands — argument parsing instead of one `streq()` per exact string
-   (e.g. split command + args so `txcol <name>` and `bgcol <name>` share one handler)
-2. Number printing (`print_int`/basic printf) — needed before anything reports a status or count
-3. IDT + PIC remap + interrupt-driven keyboard (replaces the polling loop) — foundational for
-   everything below
-4. PIT timer interrupt — system tick / uptime, needed for any future scheduling
-5. Memory management — a simple heap allocator (`malloc`-equivalent)
-6. Longer-term: multitasking, simple filesystem
+1. Wire `print()` to call `scroll()` once the cursor passes the last row — `scroll()` already
+   exists and is correct, it's just never invoked
+2. Finish the keyboard IRQ switchover: unmask IRQ1, replace `getkey()`'s polling loop with
+   something that consumes `pending_key` (already being set by keyboard_handler, currently
+   unused) — likely needs a `hlt`-based idle loop in `kernel_main` instead of busy-polling
+3. Longer-term: proper `free()`/bounds-checked allocator (current `malloc` is a bump allocator
+   that never frees), multitasking (now has a timer tick to build a scheduler on top of),
+   simple filesystem
 
 ## User context
 - Complete beginner, this is first real project beyond hello world
