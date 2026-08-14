@@ -8,6 +8,9 @@ int input_len = 0;
 
 char* heap = (char*) 0x100000;
 
+extern void isr_timer();
+extern void isr_keyboard();
+
 void* malloc(int size){
     void* ptr = heap;
     heap = heap + size;
@@ -67,10 +70,9 @@ unsigned char inb(unsigned short port){
 void outb(unsigned short port, unsigned char value){
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
 }
-struct interrupt_frame;
+
 volatile unsigned int ticks = 0;
-__attribute__((interrupt))
-void timer_handler(struct interrupt_frame* frame){
+void timer_handler(){
     ticks = ticks + 1;
     outb(0x20, 0x20);
 }
@@ -126,8 +128,7 @@ char scancode_to_ascii[] = {
     '*', 0, ' '
 };
 volatile char pending_key = 0;
-__attribute__((interrupt))
-void keyboard_handler(struct interrupt_frame* frame){
+void keyboard_handler(){
     unsigned char scancode = inb(0x60);
     if(!(scancode & 0x80)){
         if(scancode < sizeof(scancode_to_ascii)){
@@ -264,8 +265,8 @@ void run_command(){
 
 void kernel_main(){
     pic_remap();
-    set_idt_gate(0x20, (unsigned int)(unsigned long)timer_handler, 0x08, 0x8E);
-    set_idt_gate(0x21, (unsigned int)(unsigned long)keyboard_handler, 0x08, 0x8E);
+    set_idt_gate(0x20, (unsigned int)(unsigned long)isr_timer, 0x08, 0x8E);
+    set_idt_gate(0x21, (unsigned int)(unsigned long)isr_keyboard, 0x08, 0x8E);
     load_idt();
     init_pit(100);
     outb(0x21, 0xFE);
