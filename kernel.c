@@ -56,6 +56,8 @@ void print(char* str){
             video[cursor] = str[i];
             video[cursor + 1] = color;
             cursor = cursor + 2;
+        } if(cursor >= 80 * 25 * 2){
+            scroll();
         }
         i = i + 1;
     }
